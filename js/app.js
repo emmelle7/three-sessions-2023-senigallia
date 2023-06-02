@@ -36,7 +36,7 @@ global.GUI = GUI
 global.CANNON = CANNON
 global.NOISE = NOISE
 
-global.showStats = true // xxx
+global.showStats = false // xxx
 
 let myThree
 const artFolder = "sketch"
@@ -61,12 +61,12 @@ const changeSketch = (sketch) => {
 	sketch
 	const loc = current_set + '/' + sketch
 	const sketchName = loc + '.js'
-	// if (isSketchValid(`../sketch/${sketchName}`)) { // <<< enable locally to avoid stops on empty sketches
+	if (isSketchValid(`../sketch/${sketchName}`)) { // <<< enable locally to avoid stops on empty sketches
 		current_sketch = sketch
 		loadSketch(sketchName)
 		console.log('Loading Sketch: ' + sketchName)
 		document.location.hash = loc
-	// }
+	}
 }
 const loadSketch = async (sketchName) => {
 	if (myThree?.dispose()) {
@@ -77,7 +77,7 @@ const loadSketch = async (sketchName) => {
 	myThree = await import(`../sketch/${sketchName}`)
 	myThree.sketch() // LET'S ROCK
 }
-const map = (value, min1, max1, min2, max2) => {
+global.map = (value, min1, max1, min2, max2) => {
 	const returnvalue = ((value - min1) / (max1 - min1) * (max2 - min2)) + min2
 	return returnvalue
 }
@@ -169,7 +169,7 @@ class mic {
 			return rms
 		}
 		//freq = n * SAMPLE_RATE / MY_FFT_SIZE
-		this.mapFreq = function (i) {
+		global.mapFreq = function (i) {
 			// const freq = i * SAMPLE_RATE / FFT_SIZE;
 			const freq = i * SAMPLE_RATE / self.spectrum.length
 			return freq
@@ -215,7 +215,7 @@ class mic {
 		this.getHighsVol = function (_min, _max) {
 			var min = _min || 0
 			var max = _max || 100
-			var v = map(this.getRMS(this.getMix().highs), 0, self.peak_volume, min, max)
+			var v = global.map(this.getRMS(this.getMix().highs), 0, self.peak_volume, min, max)
 			return v
 		}
 		this.getMidsVol = function (_min, _max) {
@@ -281,7 +281,7 @@ const loadCubeTexture = (name, path, format) => {
 	global.cubeTextures.push({
 		name: name,
 		texture: cubeTextureLoader.load(urls, (cube) => {
-			console.log('loadedCubeTexture' + cube)
+			console.log('loadedCubeTexture: ' + cube)
 		})
 	})
 }
@@ -292,7 +292,7 @@ const loadTexture = (name, path, format) => {
 	global.textures.push({
 		name: name,
 		texture: textureLoader.load(url, (texture) => {
-			console.log('loadedTexture' + texture)
+			console.log('loadedTexture: ' + texture)
 		})
 	})
 }
@@ -301,17 +301,22 @@ const loadTexture = (name, path, format) => {
 loadCubeTexture('PureSky', './assets/textures/cube/PureSky-256/', '.png') // 0
 loadCubeTexture('MilkyWay', './assets/textures/cube/MilkyWay/dark-s_', '.jpg') // 1
 loadCubeTexture('teatro', './assets/textures/cube/teatro/', '.png') // 2
+loadCubeTexture('FacesColorAI', './assets/textures/cube/FacesColorAI/', '.png') // 3
+loadCubeTexture('FacesBkAI', './assets/textures/cube/FacesBkAI/', '.png') // 4
+loadCubeTexture('FacesColorDetails', './assets/textures/cube/FacesColorDetails/', '.png') // 5
+loadCubeTexture('MilkyWay', './assets/textures/cube/NewMilkyWay/dark-s_', '.jpg') // 6
 // global.textures[n]
 loadTexture('StoneDiff', './assets/textures/stone_tiles_02_diff_1k', '.jpg') // 0
 loadTexture('StoneDisp', './assets/textures/stone_tiles_02_disp_4k', '.png') // 1
 loadTexture('Facce_colori', './assets/textures/Mosaico_facce_colori', '.jpg') // 2
 loadTexture('Facce_bk', './assets/textures/Mosaico_facce_bk', '.jpg') // 3
-loadTexture('Lion', 'https://allyourhtml.club/carousel/lion', '.jpg') // 4
+loadTexture('Cloud', './assets/textures/cloud', '.png') // 4
+loadTexture('Lavatile', './assets/textures/lavatile', '.jpg') // 5
 
 // INIT
 const init = () => {
 	window.document.body.style.cursor = 'none'
-	changeSet(2)
+	changeSet(0)
 	// RENDERER
 	global.renderer = new THREE.WebGLRenderer({
 		alpha: true,

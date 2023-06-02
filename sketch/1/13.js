@@ -13,6 +13,9 @@ let controls
 export function sketch() {
     console.log("Sketch launched")
 
+    let backColorLightness = 50 + '%'
+    let backColor = new THREE.Color(`hsl(0, 100%, ${backColorLightness})`);
+
     const p = {
         // planets 
         goldScale: 3,
@@ -30,7 +33,7 @@ export function sketch() {
         autoRotateSpeed: -2,
         camera: 35,
         // world
-        backgroundColor: 0xff0000,
+        backgroundColor: backColor,
         floor: -5,
     }
 
@@ -178,6 +181,10 @@ export function sketch() {
             silver.rotation.y += noise3D(0, 0, t + 10) * p.silverRotationSpeed
         }
         // ...
+
+        pointLight.intensity =  MIC.getHighsVol(1, 4)
+        pointLight2.intensity = MIC.getHighsVol(3,.1)
+        
 
         controls.update()
         renderer.render(scene, camera) // RENDER

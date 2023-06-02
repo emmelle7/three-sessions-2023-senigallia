@@ -1,131 +1,199 @@
-var noise = new SimplexNoise();
-var vizInit = function (){
-  
-  //var audio = document.getElementById("audio");
+// Particles grid + Shader + Wave effect
 
-  audio.src = '/audio/Iosonouncane_Hajar.mp3';
-  audio.play();
-  play();
-  
-  
-function play() {
-    var context = new AudioContext();
-    var src = context.createMediaElementSource(audio);
-    var analyser = context.createAnalyser();
-    src.connect(analyser);
-    analyser.connect(context.destination);
-    analyser.fftSize = 512;
-    var bufferLength = analyser.frequencyBinCount;
-    var dataArray = new Uint8Array(bufferLength);
-    var scene = new THREE.Scene();
-    var group = new THREE.Group();
-    var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0,0,300);
-    camera.lookAt(scene.position);
-    scene.add(camera);
-    
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
-    var icosahedronGeometry = new THREE.IcosahedronGeometry(0.1, 4); //(radius, details)
-    var lambertMaterial = new THREE.MeshLambertMaterial({
-        color: 0xffffff,
-        wireframe: false
-    });
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 
-    var ball = new THREE.Mesh(icosahedronGeometry, lambertMaterial);
-    ball.position.set(0, 0, 0); //centro di rotazione su se stessa
-    group.add(ball);
+let scene
+let material
+let geometry
+let particles
+let count = 0
+let animation
+let onWindowResize
+let controls
+let composer
+let renderPass
+let bloomPass
 
-    var ambientLight = new THREE.AmbientLight(0xe6e3e3);
-    scene.add(ambientLight);
+export function sketch() {
+    console.log("Sketch launched")
 
-    var spotLight = new THREE.SpotLight(0xbb192a);
-    spotLight.intensity = 0.5;
-    spotLight.position.set(-10, 40, 10);
-    spotLight.lookAt(ball);
-    spotLight.castShadow = true;
-    scene.add(spotLight);
-    
-    scene.add(group);
-
-    render();
-
-    function render() {
-      analyser.getByteFrequencyData(dataArray);
-
-      var lowerHalfArray = dataArray.slice(0, (dataArray.length/2) - 1);
-      var upperHalfArray = dataArray.slice((dataArray.length/2) - 1, dataArray.length - 1);
-
-      var overallAvg = avg(dataArray);
-      var lowerMax = max(lowerHalfArray);
-      var lowerAvg = avg(lowerHalfArray);
-      var upperMax = max(upperHalfArray);
-      var upperAvg = avg(upperHalfArray);
-
-      var lowerMaxFr = lowerMax / lowerHalfArray.length;
-      var lowerAvgFr = lowerAvg / lowerHalfArray.length;
-      var upperMaxFr = upperMax / upperHalfArray.length;
-      var upperAvgFr = upperAvg / upperHalfArray.length;
-
-     
-      
-      makeRoughBall(ball, modulate(Math.pow(lowerMaxFr, 0.8), 0, 1, 0, 8), modulate(upperAvgFr, 0, 1, 0, 4));
-
-      group.rotation.y += 0.005;
-      renderer.render(scene, camera);
-      requestAnimationFrame(render);
+    const p = {
+        // toggle
+        kind: 'freq2', // wave, freq1, freq2, ...
+        scaleVol: false,
+        modeY: false,
+        // grid
+        gridUnit: 10,
+        rows: 3,
+        columns: 3,
+        // unit transformation
+        micSensitivity: .1,
+        pointMaxWidth: 10,
+        pointMinWidth: 2,
+        pointMaxY: 30,
+        pointGroundY: 0,
+        // view
+        lookAtCenter: new THREE.Vector3(-5, 0, -5),
+        cameraPosition: new THREE.Vector3(-5, 100, 0),
+        // lookAtCenter: new THREE.Vector3(-unit/2, 0, -unit/2),
+        // cameraPosition: new THREE.Vector3(-unit/2, 100*, 0),
+        autoRotate: false,
+        autoRotateSpeed: -0.2,
+        camera: 35,
+        // bloom
+        exposure: 0.5,
+        bloomStrength: 2,
+        bloomThreshold: .2,
+        bloomRadius: .7,
     }
 
-    function onWindowResize() {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
+    // other parameters
+    let near = .2, far = 1000
+
+    // CAMERA
+    let camera = new THREE.PerspectiveCamera(p.camera, window.innerWidth / window.innerHeight, near, far)
+    camera.position.copy(p.cameraPosition)
+    camera.lookAt(p.lookAtCenter)
+
+    // WINDOW RESIZE
+    const onWindowResize = () => {
+        camera.aspect = window.innerWidth / window.innerHeight
+        camera.updateProjectionMatrix()
+        renderer.setSize(window.innerWidth, window.innerHeight)
     }
+    window.addEventListener('resize', onWindowResize)
 
-    function makeRoughBall(mesh, bassFr, treFr) {
-        mesh.geometry.vertices.forEach(function (vertex, i) {
-            var offset = mesh.geometry.parameters.radius;
-            var amp = 7;
-            var time = window.performance.now();
-            vertex.normalize();
-            var rf = 0.00001;
-            var distance = (offset + bassFr ) + noise.noise3D(vertex.x + time *rf*7, vertex.y +  time*rf*8, vertex.z + time*rf*9) * amp * treFr;
-            vertex.multiplyScalar(distance);
-        });
-        mesh.geometry.verticesNeedUpdate = true;
-        mesh.geometry.normalsNeedUpdate = true;
-        mesh.geometry.computeVertexNormals();
-        mesh.geometry.computeFaceNormals();
+    // CONTROLS
+    controls = new OrbitControls(camera, renderer.domElement)
+    controls.enablePan = false
+    controls.enableDamping = true
+    controls.dampingFactor = 0.05
+    controls.autoRotate = p.autoRotate
+    controls.autoRotateSpeed = p.autoRotateSpeed
+    controls.target = p.lookAtCenter
+    controls.update()
+
+    // SCENE
+    scene = new THREE.Scene()
+    const numParticles = p.columns * p.rows
+    const positions = new Float32Array(numParticles * 3)
+    const positionsYToBe = new Float32Array(numParticles)
+    const scalesToBe = new Float32Array(numParticles)
+    const scales = new Float32Array(numParticles)
+    let i = 0, j = 0
+    for (let ix = 0; ix < p.columns; ix++) {
+        for (let iy = 0; iy < p.rows; iy++) {
+            positions[i] = ix * p.gridUnit - ((p.columns * p.gridUnit) / 2) // x
+            positions[i + 1] = 0 // y
+            positionsYToBe[j] = 0 // y To be
+            positions[i + 2] = iy * p.gridUnit - ((p.rows * p.gridUnit) / 2) // z
+            scales[j] = p.pointMinWidth;
+            scalesToBe[j] = p.pointMinWidth // scale to be
+            i += 3;
+            j++;
+        }
     }
+    geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geometry.setAttribute('scale', new THREE.BufferAttribute(scales, 1))
+    material = new THREE.ShaderMaterial({
+        uniforms: {
+            color: { value: new THREE.Color(0xffffff) },
+        },
+        vertexShader: `attribute float scale;
+                       void main() {
+                           vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+                           gl_PointSize = scale * ( 300.0 / - mvPosition.z );
+                           gl_Position = projectionMatrix * mvPosition;
+                       }`,
+        fragmentShader: `uniform vec3 color;
+                         void main() {
+                           if ( length( gl_PointCoord - vec2( 0.5, 0.5 ) ) > 0.475 ) discard;
+                           gl_FragColor = vec4( color, 1.0 );
+                         }`
+    })
+    particles = new THREE.Points(geometry, material);
+    scene.add(particles);
 
-    
+    // POST-PROCESSING
+    composer = new EffectComposer(renderer)
+    renderPass = new RenderPass(scene, camera)
+    composer.addPass(renderPass)
+    bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+    bloomPass.threshold = p.bloomThreshold
+    bloomPass.strength = p.bloomStrength
+    bloomPass.radius = p.bloomRadius
+    composer.addPass(bloomPass)
 
-    audio.play();
-  };
+    // ANIMATE
+    const animate = () => {
+        if (showStats) stats.begin() // XXX
+
+        // ANIMATION
+        const positions = particles.geometry.attributes.position.array;
+        const scales = particles.geometry.attributes.scale.array;
+        let i = 0, j = 0
+        for (let ix = 0; ix < p.columns; ix++) {
+            for (let iy = 0; iy < p.rows; iy++) {
+                if (p.kind === 'wave') {
+                    positions[i + 1] = (Math.sin((ix + count) * 0.3) * p.pointMaxY) + (Math.sin((iy + count) * 0.5) * p.pointMaxY)
+                    scales[j] = (Math.sin((ix + count) * 0.3) + 1) * p.pointMaxWidth + (Math.sin((iy + count) * 0.5) + 1) * p.pointMaxWidth
+                } else if (p.kind === 'freq1') {
+                    const pointVol = MIC.mapSound(i / 3, numParticles, p.pointGroundY, p.pointMaxY)
+                    if (p.modeY) positions[i + 1] = pointVol
+                    if (p.scaleVol) {
+                        const pointVolScale = MIC.getVol(p.pointMinWidth, p.pointMaxWidth)
+                        scales[j] = pointVolScale
+                    } else {
+                        const pointVolScale = MIC.mapSound(ix, p.columns, p.pointMinWidth, p.pointMaxWidth)
+                        scales[j] = pointVolScale
+                    }
+                } else if (p.kind === 'freq2') {
+                    const pointVol = MIC.mapSound(ix, p.columns, p.pointGroundY, p.pointMaxY)
+                    if (p.modeY) positions[i + 1] = pointVol
+                    if (p.scaleVol) {
+                        const pointVolScale = MIC.getVol(p.pointMinWidth, p.pointMaxWidth)
+                        scales[j] = pointVolScale
+                    } else {
+                        const pointVolScale = MIC.mapSound(ix, p.columns, p.pointMinWidth, p.pointMaxWidth)
+                        scalesToBe[j] = pointVolScale
+                        if (scalesToBe[j] > scales[j]) {
+                            scales[j] += p.micSensitivity
+                        } else if (scalesToBe[j] < scales[j]) {
+                            scales[j] -= p.micSensitivity
+                        }
+                    }
+                }
+                i += 3
+                j++
+            }
+        }
+        particles.geometry.attributes.position.needsUpdate = true
+        particles.geometry.attributes.scale.needsUpdate = true
+        count += 0.1
+
+        controls.update()
+
+        renderer.render(scene, camera) // RENDER
+        composer.render() // POST-PROCESSING
+        if (showStats) stats.end() // XXX
+
+        animation = requestAnimationFrame(animate) // CIAK
+    }
+    animate()
 }
 
-window.onload = vizInit();
-
-document.body.addEventListener('touchend', function(ev) { context.resume(); });
-
-
-
-
-
-function fractionate(val, minVal, maxVal) {
-    return (val - minVal)/(maxVal - minVal);
-}
-
-function modulate(val, minVal, maxVal, outMin, outMax) {
-    var fr = fractionate(val, minVal, maxVal);
-    var delta = outMax - outMin;
-    return outMin + (fr * delta);
-}
-
-function avg(arr){
-    var total = arr.reduce(function(sum, b) { return sum + b; });
-    return (total / arr.length);
-}
-
-function max(arr){
-    return arr.reduce(function(a, b){ return Math.max(a, b); })
+export function dispose() {
+    cancelAnimationFrame(animation)
+    controls.dispose()
+    geometry?.dispose()
+    material?.dispose()
+    composer?.dispose()
+    renderPass?.dispose()
+    bloomPass?.dispose()
+    window.removeEventListener('resize', onWindowResize)
 }

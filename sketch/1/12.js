@@ -179,6 +179,9 @@ export function sketch() {
         }
         // ...
 
+        pointLight.intensity =  MIC.getHighsVol(1, 4)
+        pointLight2.intensity = MIC.getHighsVol(3,.1)
+        
         controls.update()
         renderer.render(scene, camera) // RENDER
         if (showStats) stats.end() // XXX

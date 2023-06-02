@@ -1,4 +1,6 @@
-// Planet Cone + Noise + Bloom
+// Calavera + Noise + Bloom
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
@@ -6,8 +8,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 
 let scene
-let geometry, groundGeom
-let material, material2, groundMate
+let geometry
+let material, material2
 let animation
 let onWindowResize
 let noise3D
@@ -15,6 +17,7 @@ let controls
 let composer
 let renderPass
 let bloomPass
+let loaderGLTF
 
 export function sketch() {
     console.log("Sketch launched")
@@ -27,17 +30,17 @@ export function sketch() {
         planetScaleAuto: true,
         planetScaleMax: .25,
         planetPos: new THREE.Vector3(0, 3, 0),
-        planetSpeed: 1,
-        planetRotationSpeed: 0.005,
+        planetSpeed: .2,
+        planetRotationSpeed: 2,
         // view
-        lookAtCenter: new THREE.Vector3(0, 0, 0),
-        cameraPosition: new THREE.Vector3(Math.random() * 30, 0, 30),
-        autoRotate: true,
+        lookAtCenter: new THREE.Vector3(0, 1, 0),
+        cameraPosition: new THREE.Vector3(0, 0, 10),
+        autoRotate: false,
         autoRotateSpeed: -0.02,
-        camera: 45,
+        camera: 35,
         // bloom
         exposure: 0,
-        bloomStrength: 1.4,
+        bloomStrength: 2,
         bloomThreshold: .25,
         bloomRadius: 1.2,
         // world
@@ -76,9 +79,49 @@ export function sketch() {
 
     // SCENE
     scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x000000)
+    scene.background = new THREE.Color(0x4a004a)
     scene.fog = new THREE.Fog(scene.background, 5, 100)
     geometry = new THREE.ConeGeometry(1, 2, 64)
+
+    // CALAVERA
+    // This "skull" model is based on "Skull Salazar (Downloadable)" (https://sketchfab.com/3d-models/skull-salazar-downloadable-eeed09437afb4e1ea8a6ff3b0e9964ad) by jvitorsouzadesign (https://sketchfab.com/jvitorsouzadesign) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+    //GLTFLoader
+    let gltfLoaded = false
+    let calavera
+    loaderGLTF = new GLTFLoader()
+    loaderGLTF.load(
+        // resource URL
+        './assets/calavera/scene.gltf',
+        // called when the resource is loaded
+        (gltf) => {
+            // gltf.animations // Array<THREE.AnimationClip>
+            // gltf.scene.scale.set(0.075, 0.075, 0.075)
+            // gltf.scene.position.x = -0.85
+            // gltf.scene.position.y = 3.35
+            // gltf.scene // THREE.Group
+            // gltf.scenes // Array<THREE.Group>
+            // gltf.asset // Object
+            // gltf.scene.children[0].material = material XXX
+            calavera = gltf.scene.children[0].children[0].children[0]
+            calavera.position.copy(p.lookAtCenter)
+            calavera.position.y += 1.6
+            calavera.rotation.x = +.65
+            scene.add(calavera)
+            let calaveraMat = calavera.children[0].material
+            console.log(calaveraMat)
+            calaveraMat.map = null
+            calaveraMat.roughness = 1
+            gltfLoaded = true
+        },
+        (xhr) => {
+            console.log((xhr.loaded / xhr.total * 100) + '% loaded')
+        },
+        (error) => {
+            console.log('An error happened loading the GLTF scene')
+        }
+    )
+
+
 
     // POST-PROCESSING
     composer = new EffectComposer(renderer)
@@ -105,7 +148,7 @@ export function sketch() {
     planet.scale.set(p.planetScale, p.planetScale, p.planetScale)
     planet.castShadow = true
     planet.receiveShadow = true
-    scene.add(planet)
+    // scene.add(planet)
 
     // Planet cone 2
     let planet2
@@ -125,33 +168,36 @@ export function sketch() {
     scene.add(planet2)
 
     // LIGHTS
-    let lightS = new THREE.SpotLight(0x999999, 1, 0, Math.PI / 5, 0.5)
-    lightS.position.set(1, 50, 0)
-    lightS.target.position.set(0, 0, 0)
-    lightS.castShadow = true
-    lightS.shadow.camera.near = 5
-    lightS.shadow.camera.far = 200
-    lightS.shadow.bias = 0.0001
-    lightS.shadow.mapSize.width = shadowMapWidth
-    lightS.shadow.mapSize.height = shadowMapHeight
-    scene.add(lightS)
+    // let lightS = new THREE.SpotLight(0x999999, 1, 0, Math.PI / 5, 0.5)
+    // lightS.position.set(1, 50, 0)
+    // lightS.target.position.set(0, 0, 0)
+    // lightS.castShadow = true
+    // lightS.shadow.camera.near = 5
+    // lightS.shadow.camera.far = 200
+    // lightS.shadow.bias = 0.0001
+    // lightS.shadow.mapSize.width = shadowMapWidth
+    // lightS.shadow.mapSize.height = shadowMapHeight
+    // scene.add(lightS)
 
     const light = new THREE.DirectionalLight(0xffffff, 1)
-    light.position.set(-10, 3, 0)
-    light.target.position.set(-5, 0, 0)
-    // light.castShadow = true
+    light.position.set(0, 5, 3)
+    light.target.position.set(0, 1, 0)
+    // // light.castShadow = true
     scene.add(light)
     // const light2 = new THREE.DirectionalLight(0xffffff, .4)
     // light.position.set(-10, 3, 0)
     // light.target.position.set(-5, 0, 0)
     // light.castShadow = true
     // scene.add(light2)
-    const pointLight = new THREE.PointLight(0xffffff, 2)
-    pointLight.position.set(20, 20, 20)
-    scene.add(pointLight)
-    const pointLight2 = new THREE.PointLight(0xffffff, .1)
-    pointLight2.position.set(-30, 20, -20)
-    scene.add(pointLight2)
+    const pointLight1 = new THREE.PointLight(0xff0000, 10)
+    pointLight1.position.set(0, 1, 2)
+    scene.add(pointLight1)
+    // const pointLight = new THREE.PointLight(0xffffff, .5)
+    // pointLight.position.set(20, 20, 20)
+    // scene.add(pointLight)
+    // const pointLight2 = new THREE.PointLight(0xffffff, .1)
+    // pointLight2.position.set(-30, 20, -20)
+    // scene.add(pointLight2)
     // const ambientLight = new THREE.AmbientLight(0xffffff)
     // scene.add(ambientLight)
 
@@ -177,6 +223,12 @@ export function sketch() {
         const t = t0 + performance.now() * p.timeSpeed
 
         // ANIMATION
+        if (gltfLoaded && calavera) {
+            pointLight1.position.copy(calavera.position)
+            pointLight1.position.y-=.5
+            const t3 = t * p.planetSpeed + 2
+            calavera.rotation.y = -0.1 + noise3D(0, t, 0) * 0.5// Math.sin(t) * p.planetRotationSpeed
+        }
         if (planet) {
             const t1 = t * p.planetSpeed
             planet.position.x = p.planetPos.x + noise3D(0, t1, 0) * .5
@@ -188,10 +240,10 @@ export function sketch() {
 
         if (planet2) {
             const t1 = t * p.planetSpeed
-            planet2.position.x = p.planetPos.x + noise3D(0, t1 + 14, 0) * .5
+            // planet2.position.x = p.planetPos.x + noise3D(0, t1 + 14, 0) * .5
             planet2.position.y = p.planetPos.y + noise3D(t1 + 4, 0, 0) * 1.5 - 2 * p.planetScale
-            planet2.position.z = p.planetPos.z + noise3D(0, 0, t1 + 18) * .5
-            planet2.rotation.y += noise3D(0, 0, t + 10) * p.planetRotationSpeed
+            // planet2.position.z = p.planetPos.z + noise3D(0, 0, t1 + 18) * .5
+            planet2.rotation.y += noise3D(0, 0, t + 10) * p.planetRotationSpeed * .03
             if (p.planetScaleAuto) planet2.scale.x = planet2.scale.y = planet2.scale.z = p.planetScale - (p.planetScaleMax / 2) + (noise3D(0, t1 + 12, 0) * p.planetScaleMax)
         }
         // ...
@@ -210,10 +262,11 @@ export function dispose() {
     cancelAnimationFrame(animation)
     controls?.dispose()
     geometry?.dispose()
-    groundGeom?.dispose()
     material?.dispose()
     material2?.dispose()
-    groundMate?.dispose()
     noise3D = null
+    composer?.dispose()
+    renderPass?.dispose()
+    bloomPass?.dispose()
     window.removeEventListener('resize', onWindowResize)
 }

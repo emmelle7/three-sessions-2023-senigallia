@@ -40,8 +40,8 @@ export function sketch() {
         lookAtCenter: new THREE.Vector3(Math.random() * -4, 4, Math.random() * 4),
         cameraPosition: new THREE.Vector3(0, 0.5, 0), // < z will be recalculated based on columnRadius/2
         autoRotate: true,
-        autoRotateSpeed: -.5 + Math.random(),
-        camera: 55,
+        autoRotateSpeed: -1 + Math.random() * 2,
+        camera: 75,
         // bloom
         exposure: 0.5,
         bloomStrength: 2,
@@ -280,6 +280,8 @@ export function sketch() {
         }
         // ...
 
+        bloomPass.strength = MIC.getHighsVol(1.5, 5)
+
         controls.update()
         renderer.render(scene, camera) // RENDER
         composer.render() // POST-PROCESSING
@@ -305,5 +307,9 @@ export function dispose() {
     while (id--) {
         window.clearTimeout(id)
     }
+    composer?.dispose()
+    renderPass?.dispose()
+    bloomPass?.dispose()
     window?.removeEventListener('resize', onWindowResize)
+    //XXX DISPOSE BLOOM
 }

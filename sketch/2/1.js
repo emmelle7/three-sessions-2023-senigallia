@@ -37,10 +37,10 @@ export function sketch() {
         piecesNo: 11, // no of pieces per columns
         piaceMaxSize: 0.9,// + Math.random() * .3, // piece Max radius
         // view
-        lookAtCenter: new THREE.Vector3(Math.random() * -4, 4, Math.random() * 4),
+        lookAtCenter: new THREE.Vector3(-0, 4, 0),
         cameraPosition: new THREE.Vector3(0, 0.5, 0), // < z will be recalculated based on columnRadius/2
         autoRotate: true,
-        autoRotateSpeed: -.5 + Math.random(),
+        autoRotateSpeed: -1 + Math.random() * 2,
         camera: 55,
         // bloom
         exposure: 0.5,
@@ -279,6 +279,7 @@ export function sketch() {
             }
         }
         // ...
+        bloomPass.strength = MIC.getHighsVol(1.5, 5)
 
         controls.update()
         renderer.render(scene, camera) // RENDER
@@ -305,5 +306,8 @@ export function dispose() {
     while (id--) {
         window.clearTimeout(id)
     }
+    composer?.dispose()
+    renderPass?.dispose()
+    bloomPass?.dispose()
     window?.removeEventListener('resize', onWindowResize)
 }
